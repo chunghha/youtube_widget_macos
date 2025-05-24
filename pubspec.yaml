@@ -1,0 +1,46 @@
+name: youtube_widget_macos
+description: A frameless YouTube widget for macOS
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Window management for macOS
+  window_manager: ^0.3.7
+
+  # WebView for YouTube
+  webview_flutter: ^4.4.2
+
+  # UI components
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: "^0.14.3" # Use the latest version
+
+flutter:
+  uses-material-design: true
+
+# macOS specific configuration
+flutter_macos:
+  platforms:
+    macos:
+      source: ../
+
+flutter_launcher_icons:
+  android: "true"
+  ios: "true"
+  image_path: "assets/icon/icon.png" # Path to your 512x512 icon.png
+  min_sdk_android: 21 # Set this to your project's minimum Android SDK version
+  # optional:
+  # adaptive_icon_background: "#ffffff" # For Android adaptive icons (background color)
+  # adaptive_icon_foreground: "assets/icon/icon_foreground.png" # For Android adaptive icons (foreground image)
