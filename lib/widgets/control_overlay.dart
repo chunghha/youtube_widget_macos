@@ -26,6 +26,9 @@ class ControlOverlay extends StatelessWidget {
   final ValueChanged<double> onSeek;
   final ValueChanged<double> onSliderChanged;
 
+  final bool showMediaControls;
+  final VoidCallback onToggleControlsIcon;
+
   const ControlOverlay({
     Key? key,
     required this.showControls,
@@ -48,6 +51,8 @@ class ControlOverlay extends StatelessWidget {
     required this.totalDuration,
     required this.onSeek,
     required this.onSliderChanged,
+    required this.showMediaControls,
+    required this.onToggleControlsIcon,
   }) : super(key: key);
 
   String _formatDuration(double seconds) {
@@ -193,15 +198,18 @@ class ControlOverlay extends StatelessWidget {
                     ],
                   ),
                 )
-              else
+              else // Controls when video is playing
                 Container(
                   padding: const EdgeInsets.all(8),
                   child: Column(
                     children: [
-                      // Play/Pause/Stop/New Video buttons
+                      // Play/Pause/Stop/New Video buttons AND Toggle Controls Icon (aligned horizontally)
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        // Use MainAxisAlignment.spaceBetween to push ends, then Spacers for centering
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Left Spacer to help center the main buttons
+                          const Spacer(),
                           IconButton(
                             onPressed: onPlayPause,
                             icon: Icon(
@@ -231,72 +239,92 @@ class ControlOverlay extends StatelessWidget {
                             ),
                             tooltip: 'Load New Video',
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Progress Bar
-                      Row(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0),
-                            child: Text(
-                              _formatDuration(currentPosition),
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 12),
-                            ),
-                          ),
-                          Expanded(
-                            child: Slider(
-                              value: currentPosition,
-                              min: 0,
-                              max: totalDuration > 0 ? totalDuration : 0.0,
-                              onChanged: onSliderChanged,
-                              onChangeEnd: onSeek,
-                              activeColor: Colors.cyan[700],
-                              inactiveColor: Colors.grey,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Text(
-                              _formatDuration(totalDuration),
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Volume Controls
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
+                          // Right Spacer to help center the main buttons
+                          const Spacer(),
+                          // Toggle Media Controls Icon Button (pushed to far right)
                           IconButton(
-                            onPressed: onToggleMute,
+                            onPressed: onToggleControlsIcon,
                             icon: Icon(
-                              isMuted || volume == 0
-                                  ? Icons.volume_off
-                                  : Icons.volume_up,
+                              showMediaControls
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: Colors.white70,
                               size: 20,
                             ),
-                            tooltip: isMuted || volume == 0 ? 'Unmute' : 'Mute',
-                          ),
-                          Expanded(
-                            child: Slider(
-                              value: volume,
-                              min: 0,
-                              max: 100,
-                              divisions: 100,
-                              onChanged: onVolumeChanged,
-                              activeColor: Colors.red,
-                              inactiveColor: Colors.grey,
-                            ),
+                            tooltip: showMediaControls
+                                ? 'Hide Media Controls'
+                                : 'Show Media Controls',
                           ),
                         ],
                       ),
+                      if (showMediaControls) ...[
+                        const SizedBox(height: 8),
+
+                        // Progress Bar
+                        Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: Text(
+                                _formatDuration(currentPosition),
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: currentPosition,
+                                min: 0,
+                                max: totalDuration > 0 ? totalDuration : 0.0,
+                                onChanged: onSliderChanged,
+                                onChangeEnd: onSeek,
+                                activeColor: Colors.cyan[700],
+                                inactiveColor: Colors.grey,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Text(
+                                _formatDuration(totalDuration),
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Volume Controls
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              onPressed: onToggleMute,
+                              icon: Icon(
+                                isMuted || volume == 0
+                                    ? Icons.volume_off
+                                    : Icons.volume_up,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              tooltip:
+                                  isMuted || volume == 0 ? 'Unmute' : 'Mute',
+                            ),
+                            Expanded(
+                              // Volume Slider
+                              child: Slider(
+                                value: volume,
+                                min: 0,
+                                max: 100,
+                                divisions: 100,
+                                onChanged: onVolumeChanged,
+                                activeColor: Colors.red,
+                                inactiveColor: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

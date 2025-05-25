@@ -38,6 +38,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   Timer? _progressTimer;
   bool _isDraggingSlider = false;
 
+  bool _showMediaControls = false;
+
   late KeyboardService _keyboardService;
 
   @override
@@ -53,6 +55,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       onPlayPausePressed: _playPauseVideo,
       onStopPressed: _stopVideo,
       onQuitPressed: WindowService.close,
+      onCmdCPressed: _toggleMediaControlsVisibility,
     );
     _keyboardService.addHandler();
   }
@@ -87,6 +90,15 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   void _toggleControlsVisibility() {
     setState(() {
       _showControls = !_showControls;
+    });
+  }
+
+  void _toggleMediaControlsVisibility() {
+    setState(() {
+      _showMediaControls = !_showMediaControls;
+      if (_showMediaControls && !_showControls) {
+        _showControls = true;
+      }
     });
   }
 
@@ -526,6 +538,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               totalDuration: _totalDuration,
               onSeek: _seekTo,
               onSliderChanged: _onSliderChanged,
+              showMediaControls: _showMediaControls,
+              onToggleControlsIcon: _toggleMediaControlsVisibility,
             ),
           ],
         ),

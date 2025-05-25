@@ -7,6 +7,7 @@ class KeyboardService {
   final VoidCallback onPlayPausePressed;
   final VoidCallback onStopPressed;
   final VoidCallback onQuitPressed;
+  final VoidCallback onCmdCPressed;
 
   KeyboardService({
     required this.onSpacePressed,
@@ -14,6 +15,7 @@ class KeyboardService {
     required this.onPlayPausePressed,
     required this.onStopPressed,
     required this.onQuitPressed,
+    required this.onCmdCPressed,
   });
 
   bool _hardwareKeyHandler(KeyEvent event) {
@@ -41,6 +43,11 @@ class KeyboardService {
               pressedKeys.contains(LogicalKeyboardKey.metaRight)) &&
           event.logicalKey == LogicalKeyboardKey.keyQ) {
         onQuitPressed();
+        return true;
+      } else if ((pressedKeys.contains(LogicalKeyboardKey.metaLeft) ||
+              pressedKeys.contains(LogicalKeyboardKey.metaRight)) &&
+          event.logicalKey == LogicalKeyboardKey.keyC) {
+        onCmdCPressed();
         return true;
       }
     }
