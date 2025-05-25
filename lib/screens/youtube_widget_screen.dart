@@ -52,6 +52,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       onCmdShiftEnterPressed: _toggleFullScreen,
       onPlayPausePressed: _playPauseVideo,
       onStopPressed: _stopVideo,
+      onQuitPressed: WindowService.close,
     );
     _keyboardService.addHandler();
   }

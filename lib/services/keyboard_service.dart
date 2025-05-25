@@ -6,12 +6,14 @@ class KeyboardService {
   final VoidCallback onCmdShiftEnterPressed;
   final VoidCallback onPlayPausePressed;
   final VoidCallback onStopPressed;
+  final VoidCallback onQuitPressed;
 
   KeyboardService({
     required this.onSpacePressed,
     required this.onCmdShiftEnterPressed,
     required this.onPlayPausePressed,
     required this.onStopPressed,
+    required this.onQuitPressed,
   });
 
   bool _hardwareKeyHandler(KeyEvent event) {
@@ -34,6 +36,11 @@ class KeyboardService {
         return true;
       } else if (event.logicalKey == LogicalKeyboardKey.keyS) {
         onStopPressed();
+        return true;
+      } else if ((pressedKeys.contains(LogicalKeyboardKey.metaLeft) ||
+              pressedKeys.contains(LogicalKeyboardKey.metaRight)) &&
+          event.logicalKey == LogicalKeyboardKey.keyQ) {
+        onQuitPressed();
         return true;
       }
     }
