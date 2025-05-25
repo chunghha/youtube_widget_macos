@@ -9,6 +9,7 @@ import 'package:youtube_widget_macos/widgets/webview_player.dart';
 import 'package:youtube_widget_macos/utils/youtube_url_parser.dart';
 import 'package:youtube_widget_macos/services/window_service.dart';
 import 'package:youtube_widget_macos/services/keyboard_service.dart';
+import 'package:youtube_widget_macos/services/shared_preferences_service.dart';
 
 class YouTubeWidgetScreen extends StatefulWidget {
   const YouTubeWidgetScreen({Key? key}) : super(key: key);
@@ -44,6 +45,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     super.initState();
     windowManager.addListener(this);
     _initFullScreenState();
+    _loadLastPlayedUrl();
 
     _keyboardService = KeyboardService(
       onSpacePressed: _toggleControlsVisibility,
@@ -59,6 +61,14 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _keyboardService.removeHandler();
     _stopProgressTimer();
     super.dispose();
+  }
+
+  void _loadLastPlayedUrl() async {
+    final String? lastUrl = await SharedPreferencesService.loadLastPlayedUrl();
+    if (lastUrl != null && lastUrl.isNotEmpty) {
+      _urlController.text = lastUrl;
+      _loadVideo();
+    }
   }
 
   void _toggleFullScreen() async {
@@ -116,12 +126,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         'PlayerChannel',
         onMessageReceived: (JavaScriptMessage message) {
           _onJavaScriptMessage(message.message);
-        },
-      )
-      ..addJavaScriptChannel(
-        'ConsoleChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          // print('WebView Console: ${message.message}');
         },
       )
       ..setNavigationDelegate(
@@ -237,19 +241,17 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         _isPlayerReady = true;
       });
       _startProgressTimer();
+      SharedPreferencesService.saveLastPlayedUrl(_urlController.text);
     } else if (message.startsWith('state:')) {
       final state = int.parse(message.split(':')[1]);
       setState(() {
         if (state == 1) {
-          // Playing
           _isPlaying = true;
           _startProgressTimer();
         } else if (state == 2) {
-          // Paused
           _isPlaying = false;
           _stopProgressTimer();
         } else if (state == 0) {
-          // Ended
           _isPlaying = false;
           _stopProgressTimer();
           _currentPosition = _totalDuration;
@@ -357,7 +359,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
           _isPlaying &&
           !_isDraggingSlider) {
         try {
-          // CORRECTED: Check if the result is a num and convert to double
           final Object? currentTimeResult = await _webController
               ?.runJavaScriptReturningResult('player.getCurrentTime();');
           final Object? durationResult = await _webController
@@ -377,7 +378,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
             }
           }
         } catch (e) {
-          // print('Error getting player progress: $e');
+          // Handle JavaScript execution errors gracefully
         }
       } else if (!_isPlaying) {
         _stopProgressTimer();

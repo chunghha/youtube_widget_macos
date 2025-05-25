@@ -79,7 +79,6 @@ class ControlOverlay extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                // CORRECTED: Use withAlpha instead of withOpacity
                 Colors.black.withAlpha((255 * 0.8).round()),
                 Colors.transparent,
                 Colors.transparent,
