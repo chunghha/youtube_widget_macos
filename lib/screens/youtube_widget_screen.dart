@@ -50,6 +50,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _keyboardService = KeyboardService(
       onSpacePressed: _toggleControlsVisibility,
       onCmdShiftEnterPressed: _toggleFullScreen,
+      onPlayPausePressed: _playPauseVideo,
+      onStopPressed: _stopVideo,
     );
     _keyboardService.addHandler();
   }
@@ -266,6 +268,14 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       });
       _showErrorDialog(
           'YouTube Player Error: $errorCode. This might be due to video restrictions or network issues.');
+    }
+  }
+
+  void _playPauseVideo() {
+    if (_isPlaying) {
+      _pauseVideo();
+    } else {
+      _playVideo();
     }
   }
 

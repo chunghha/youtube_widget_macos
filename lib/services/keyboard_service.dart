@@ -4,10 +4,14 @@ import 'package:flutter/services.dart';
 class KeyboardService {
   final VoidCallback onSpacePressed;
   final VoidCallback onCmdShiftEnterPressed;
+  final VoidCallback onPlayPausePressed;
+  final VoidCallback onStopPressed;
 
   KeyboardService({
     required this.onSpacePressed,
     required this.onCmdShiftEnterPressed,
+    required this.onPlayPausePressed,
+    required this.onStopPressed,
   });
 
   bool _hardwareKeyHandler(KeyEvent event) {
@@ -24,6 +28,12 @@ class KeyboardService {
               pressedKeys.contains(LogicalKeyboardKey.shiftRight)) &&
           event.logicalKey == LogicalKeyboardKey.enter) {
         onCmdShiftEnterPressed();
+        return true;
+      } else if (event.logicalKey == LogicalKeyboardKey.keyP) {
+        onPlayPausePressed();
+        return true;
+      } else if (event.logicalKey == LogicalKeyboardKey.keyS) {
+        onStopPressed();
         return true;
       }
     }
