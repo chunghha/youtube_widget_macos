@@ -74,15 +74,13 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     _initFullScreenState(); // Initialize fullscreen state
-    HardwareKeyboard.instance
-        .addHandler(_hardwareKeyHandler); // Add global keyboard listener
+    HardwareKeyboard.instance.addHandler(_hardwareKeyHandler); // Add global keyboard listener
   }
 
   // HardwareKeyboard handler for global shortcuts
   bool _hardwareKeyHandler(KeyEvent event) {
     if (event is KeyDownEvent) {
-      final Set<LogicalKeyboardKey> pressedKeys =
-          HardwareKeyboard.instance.logicalKeysPressed;
+      final Set<LogicalKeyboardKey> pressedKeys = HardwareKeyboard.instance.logicalKeysPressed;
 
       // Toggle controls with Space key
       if (event.logicalKey == LogicalKeyboardKey.space) {
@@ -92,11 +90,9 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
         return true; // Consume the event
       }
       // Toggle fullscreen with Cmd+Shift+Enter
-      else if ((pressedKeys.contains(LogicalKeyboardKey.metaLeft) ||
-              pressedKeys.contains(LogicalKeyboardKey.metaRight)) &&
-          (pressedKeys.contains(LogicalKeyboardKey.shiftLeft) ||
-              pressedKeys.contains(LogicalKeyboardKey.shiftRight)) &&
-          event.logicalKey == LogicalKeyboardKey.enter) {
+      else if ((pressedKeys.contains(LogicalKeyboardKey.metaLeft) || pressedKeys.contains(LogicalKeyboardKey.metaRight)) &&
+               (pressedKeys.contains(LogicalKeyboardKey.shiftLeft) || pressedKeys.contains(LogicalKeyboardKey.shiftRight)) &&
+               event.logicalKey == LogicalKeyboardKey.enter) {
         _toggleFullScreen(); // Call the method to toggle fullscreen
         return true; // Consume the event
       }
@@ -108,10 +104,8 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
   void _toggleFullScreen() async {
     final bool currentFullScreenState = await windowManager.isFullScreen();
     await windowManager.setFullScreen(!currentFullScreenState);
-    await Future.delayed(
-        const Duration(milliseconds: 100)); // Small delay for native transition
-    final bool newState =
-        await windowManager.isFullScreen(); // Get actual new state
+    await Future.delayed(const Duration(milliseconds: 100)); // Small delay for native transition
+    final bool newState = await windowManager.isFullScreen(); // Get actual new state
     setState(() {
       _isFullScreen = newState; // Update based on actual state
     });
@@ -127,8 +121,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
   void dispose() {
     windowManager.removeListener(this);
     _urlController.dispose();
-    HardwareKeyboard.instance
-        .removeHandler(_hardwareKeyHandler); // Remove global keyboard listener
+    HardwareKeyboard.instance.removeHandler(_hardwareKeyHandler); // Remove global keyboard listener
     super.dispose();
   }
 
@@ -186,8 +179,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
             setState(() {
               _isLoading = false;
             });
-            _webController
-                ?.runJavaScript('resizePlayer();'); // Call resize function
+            _webController?.runJavaScript('resizePlayer();'); // Call resize function
           },
           onWebResourceError: (WebResourceError error) {
             setState(() {
@@ -283,14 +275,11 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
       final state = int.parse(message.split(':')[1]);
       // YT.PlayerState constants: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
       setState(() {
-        if (state == 1) {
-          // Playing
+        if (state == 1) { // Playing
           _isPlaying = true;
-        } else if (state == 2) {
-          // Paused
+        } else if (state == 2) { // Paused
           _isPlaying = false;
-        } else if (state == 0) {
-          // Ended
+        } else if (state == 0) { // Ended
           _isPlaying = false;
         }
       });
@@ -301,8 +290,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
         _isLoading = false;
         _isPlaying = false;
       });
-      _showErrorDialog(
-          'YouTube Player Error: $errorCode. This might be due to video restrictions or network issues.');
+      _showErrorDialog('YouTube Player Error: $errorCode. This might be due to video restrictions or network issues.');
     }
   }
 
@@ -461,8 +449,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
               ),
 
             // Control Overlay
-            IgnorePointer(
-              // Ignore pointer events when controls are not shown
+            IgnorePointer( // Ignore pointer events when controls are not shown
               ignoring: !_showControls,
               child: AnimatedOpacity(
                 opacity: _showControls ? 1.0 : 0.0,
@@ -506,6 +493,16 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
                                 ),
                               ),
                             ),
+                            // Minimize button
+                            IconButton(
+                              onPressed: () => windowManager.minimize(),
+                              icon: const Icon(
+                                Icons.minimize,
+                                color: Colors.white70,
+                                size: 16,
+                              ),
+                              tooltip: 'Minimize',
+                            ),
                             // Close button
                             IconButton(
                               onPressed: () => windowManager.close(),
@@ -514,6 +511,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
                                 color: Colors.white70,
                                 size: 16,
                               ),
+                              tooltip: 'Close',
                             ),
                           ],
                         ),
@@ -579,22 +577,18 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              IconButton(
-                                onPressed:
-                                    _isPlaying ? _pauseVideo : _playVideo,
+                               IconButton(
+                                onPressed: _isPlaying ? _pauseVideo : _playVideo,
                                 icon: Icon(
                                   _isPlaying ? Icons.pause : Icons.play_arrow,
                                   color: Colors.white70,
-                                  size:
-                                      24, // Slightly larger icon for play/pause
+                                  size: 24, // Slightly larger icon for play/pause
                                 ),
                                 tooltip: _isPlaying ? 'Pause' : 'Play',
                               ),
-                              const SizedBox(
-                                  width: 16), // Spacing between buttons
+                              const SizedBox(width: 16), // Spacing between buttons
                               IconButton(
-                                onPressed:
-                                    _stopVideo, // Call the new stop function
+                                onPressed: _stopVideo, // Call the new stop function
                                 icon: const Icon(
                                   Icons.stop,
                                   color: Colors.white70,
@@ -602,8 +596,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
                                 ),
                                 tooltip: 'Stop Video',
                               ),
-                              const SizedBox(
-                                  width: 16), // Spacing between buttons
+                              const SizedBox(width: 16), // Spacing between buttons
                               IconButton(
                                 onPressed: () {
                                   // Reset button state when loading new video
@@ -614,8 +607,7 @@ class _YouTubeWidgetState extends State<YouTubeWidget> with WindowListener {
                                     _isLoading = false;
                                     _hasError = false;
                                     _isPlaying = false; // Reset playback state
-                                    _isPlayerReady =
-                                        false; // Reset player ready state
+                                    _isPlayerReady = false; // Reset player ready state
                                   });
                                 },
                                 icon: const Icon(
