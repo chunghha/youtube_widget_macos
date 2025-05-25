@@ -1,4 +1,6 @@
 // lib/screens/youtube_widget_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -27,9 +29,13 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   bool _isPlayerReady = false;
   bool _isFullScreen = false;
 
-  // NEW: Volume and Mute state
-  double _volume = 100.0; // Volume from 0.0 to 100.0
+  double _volume = 100.0;
   bool _isMuted = false;
+
+  double _currentPosition = 0.0;
+  double _totalDuration = 0.0;
+  Timer? _progressTimer;
+  bool _isDraggingSlider = false;
 
   late KeyboardService _keyboardService;
 
@@ -51,10 +57,10 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     windowManager.removeListener(this);
     _urlController.dispose();
     _keyboardService.removeHandler();
+    _stopProgressTimer();
     super.dispose();
   }
 
-  // --- Window Management Callbacks ---
   void _toggleFullScreen() async {
     final bool currentFullScreenState = await WindowService.isFullScreen();
     await WindowService.setFullScreen(!currentFullScreenState);
@@ -76,7 +82,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     setState(() {});
   }
 
-  // --- WebView & Video Playback Logic ---
   void _loadVideo() {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
@@ -90,6 +95,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         _isLoading = true;
         _isPlayerReady = false;
         _isPlaying = false;
+        _currentPosition = 0.0;
+        _totalDuration = 0.0;
       });
       _initializeWebView(videoId);
     } else {
@@ -139,7 +146,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         ),
       );
 
-    // NEW: Pass initialVolume and initialMuted to the HTML content
     final String htmlContent = '''
       <!DOCTYPE html>
       <html>
@@ -160,7 +166,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
 
               var player;
 
-              // NEW: Initial volume and mute state from Flutter
               var initialVolume = ${_volume.round()};
               var initialMuted = $_isMuted;
 
@@ -197,7 +202,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                   }, 50);
                   resizePlayer();
 
-                  // NEW: Set initial volume and mute state
                   player.setVolume(initialVolume);
                   if (initialMuted) {
                       player.mute();
@@ -232,18 +236,23 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       setState(() {
         _isPlayerReady = true;
       });
+      _startProgressTimer();
     } else if (message.startsWith('state:')) {
       final state = int.parse(message.split(':')[1]);
       setState(() {
         if (state == 1) {
           // Playing
           _isPlaying = true;
+          _startProgressTimer();
         } else if (state == 2) {
           // Paused
           _isPlaying = false;
+          _stopProgressTimer();
         } else if (state == 0) {
           // Ended
           _isPlaying = false;
+          _stopProgressTimer();
+          _currentPosition = _totalDuration;
         }
       });
     } else if (message.startsWith('error:')) {
@@ -264,6 +273,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       setState(() {
         _isPlaying = true;
       });
+      _startProgressTimer();
     }
   }
 
@@ -273,6 +283,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       setState(() {
         _isPlaying = false;
       });
+      _stopProgressTimer();
     }
   }
 
@@ -281,16 +292,17 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       _webController?.runJavaScript('player.stopVideo();');
       setState(() {
         _isPlaying = false;
+        _currentPosition = 0.0;
       });
+      _stopProgressTimer();
     }
   }
 
-  // NEW: Volume control methods
   void _setVolume(double newVolume) {
     if (_webController != null && _isPlayerReady) {
       setState(() {
         _volume = newVolume;
-        _isMuted = false; // Unmute if volume is changed
+        _isMuted = false;
       });
       _webController?.runJavaScript('player.setVolume(${newVolume.round()});');
       _webController?.runJavaScript('player.unMute();');
@@ -303,7 +315,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
 
   void _toggleMute() async {
     if (_webController != null && _isPlayerReady) {
-      final bool currentlyMuted = _isMuted; // Use local state for decision
+      final bool currentlyMuted = _isMuted;
       if (currentlyMuted) {
         await _webController?.runJavaScript('player.unMute();');
       } else {
@@ -317,6 +329,65 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         _isMuted = !_isMuted;
       });
     }
+  }
+
+  void _onSliderChanged(double value) {
+    setState(() {
+      _currentPosition = value;
+      _isDraggingSlider = true;
+    });
+  }
+
+  void _seekTo(double seconds) {
+    if (_webController != null && _isPlayerReady) {
+      _webController?.runJavaScript('player.seekTo($seconds, true);');
+      setState(() {
+        _currentPosition = seconds;
+        _isDraggingSlider = false;
+      });
+    }
+  }
+
+  void _startProgressTimer() {
+    _stopProgressTimer();
+    _progressTimer =
+        Timer.periodic(const Duration(milliseconds: 500), (timer) async {
+      if (_webController != null &&
+          _isPlayerReady &&
+          _isPlaying &&
+          !_isDraggingSlider) {
+        try {
+          // CORRECTED: Check if the result is a num and convert to double
+          final Object? currentTimeResult = await _webController
+              ?.runJavaScriptReturningResult('player.getCurrentTime();');
+          final Object? durationResult = await _webController
+              ?.runJavaScriptReturningResult('player.getDuration();');
+
+          final double? current =
+              (currentTimeResult is num) ? currentTimeResult.toDouble() : null;
+          final double? duration =
+              (durationResult is num) ? durationResult.toDouble() : null;
+
+          if (current != null && duration != null) {
+            if (mounted) {
+              setState(() {
+                _currentPosition = current;
+                _totalDuration = duration;
+              });
+            }
+          }
+        } catch (e) {
+          // print('Error getting player progress: $e');
+        }
+      } else if (!_isPlaying) {
+        _stopProgressTimer();
+      }
+    });
+  }
+
+  void _stopProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
   }
 
   void _showErrorDialog(String message) {
@@ -336,7 +407,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     );
   }
 
-  // --- Window Manager Listener Overrides ---
   @override
   void onWindowMaximize() {
     _updateFullScreenState();
@@ -397,9 +467,12 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                   _hasError = false;
                   _isPlaying = false;
                   _isPlayerReady = false;
-                  _volume = 100.0; // Reset volume
-                  _isMuted = false; // Reset mute state
+                  _volume = 100.0;
+                  _isMuted = false;
+                  _currentPosition = 0.0;
+                  _totalDuration = 0.0;
                 });
+                _stopProgressTimer();
               },
               onMinimize: WindowService.minimize,
               onClose: WindowService.close,
@@ -407,11 +480,14 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               isPlaying: _isPlaying,
               webControllerExists: _webController != null,
               hasError: _hasError,
-              // NEW: Pass volume and mute state/callbacks
               volume: _volume,
               isMuted: _isMuted,
               onVolumeChanged: _setVolume,
               onToggleMute: _toggleMute,
+              currentPosition: _currentPosition,
+              totalDuration: _totalDuration,
+              onSeek: _seekTo,
+              onSliderChanged: _onSliderChanged,
             ),
           ],
         ),

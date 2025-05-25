@@ -16,11 +16,15 @@ class ControlOverlay extends StatelessWidget {
   final bool webControllerExists;
   final bool hasError;
 
-  // NEW: Volume and Mute parameters
   final double volume;
   final bool isMuted;
   final ValueChanged<double> onVolumeChanged;
   final VoidCallback onToggleMute;
+
+  final double currentPosition;
+  final double totalDuration;
+  final ValueChanged<double> onSeek;
+  final ValueChanged<double> onSliderChanged;
 
   const ControlOverlay({
     Key? key,
@@ -36,12 +40,31 @@ class ControlOverlay extends StatelessWidget {
     required this.isPlaying,
     required this.webControllerExists,
     required this.hasError,
-    // NEW: Required parameters
     required this.volume,
     required this.isMuted,
     required this.onVolumeChanged,
     required this.onToggleMute,
+    required this.currentPosition,
+    required this.totalDuration,
+    required this.onSeek,
+    required this.onSliderChanged,
   }) : super(key: key);
+
+  String _formatDuration(double seconds) {
+    final int minutes = (seconds ~/ 60);
+    final int remainingSeconds = (seconds % 60).round();
+    final int hours = (minutes ~/ 60);
+    final int remainingMinutes = (minutes % 60);
+
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:'
+          '${remainingMinutes.toString().padLeft(2, '0')}:'
+          '${remainingSeconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${remainingMinutes.toString().padLeft(2, '0')}:'
+          '${remainingSeconds.toString().padLeft(2, '0')}';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,10 +79,11 @@ class ControlOverlay extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.8),
+                // CORRECTED: Use withAlpha instead of withOpacity
+                Colors.black.withAlpha((255 * 0.8).round()),
                 Colors.transparent,
                 Colors.transparent,
-                Colors.black.withOpacity(0.8),
+                Colors.black.withAlpha((255 * 0.8).round()),
               ],
             ),
           ),
@@ -167,6 +191,7 @@ class ControlOverlay extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   child: Column(
                     children: [
+                      // Play/Pause/Stop/New Video buttons
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -201,7 +226,43 @@ class ControlOverlay extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8), // Spacing for volume controls
+                      const SizedBox(height: 8),
+
+                      // Progress Bar
+                      Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text(
+                              _formatDuration(currentPosition),
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                          Expanded(
+                            child: Slider(
+                              value: currentPosition,
+                              min: 0,
+                              max: totalDuration > 0 ? totalDuration : 0.0,
+                              onChanged: onSliderChanged,
+                              onChangeEnd: onSeek,
+                              activeColor: Colors.cyan[700],
+                              inactiveColor: Colors.grey,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Text(
+                              _formatDuration(totalDuration),
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Volume Controls
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
