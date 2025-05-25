@@ -27,6 +27,10 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   bool _isPlayerReady = false;
   bool _isFullScreen = false;
 
+  // NEW: Volume and Mute state
+  double _volume = 100.0; // Volume from 0.0 to 100.0
+  bool _isMuted = false;
+
   late KeyboardService _keyboardService;
 
   @override
@@ -50,6 +54,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     super.dispose();
   }
 
+  // --- Window Management Callbacks ---
   void _toggleFullScreen() async {
     final bool currentFullScreenState = await WindowService.isFullScreen();
     await WindowService.setFullScreen(!currentFullScreenState);
@@ -71,6 +76,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     setState(() {});
   }
 
+  // --- WebView & Video Playback Logic ---
   void _loadVideo() {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
@@ -105,6 +111,12 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
           _onJavaScriptMessage(message.message);
         },
       )
+      ..addJavaScriptChannel(
+        'ConsoleChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          // print('WebView Console: ${message.message}');
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -127,6 +139,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         ),
       );
 
+    // NEW: Pass initialVolume and initialMuted to the HTML content
     final String htmlContent = '''
       <!DOCTYPE html>
       <html>
@@ -146,6 +159,10 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
               var player;
+
+              // NEW: Initial volume and mute state from Flutter
+              var initialVolume = ${_volume.round()};
+              var initialMuted = $_isMuted;
 
               function resizePlayer() {
                   if (player && typeof player.setSize === 'function') {
@@ -179,6 +196,14 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                       }
                   }, 50);
                   resizePlayer();
+
+                  // NEW: Set initial volume and mute state
+                  player.setVolume(initialVolume);
+                  if (initialMuted) {
+                      player.mute();
+                  } else {
+                      player.unMute();
+                  }
               }
 
               function onPlayerStateChange(event) {
@@ -211,10 +236,13 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       final state = int.parse(message.split(':')[1]);
       setState(() {
         if (state == 1) {
+          // Playing
           _isPlaying = true;
         } else if (state == 2) {
+          // Paused
           _isPlaying = false;
         } else if (state == 0) {
+          // Ended
           _isPlaying = false;
         }
       });
@@ -257,6 +285,40 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     }
   }
 
+  // NEW: Volume control methods
+  void _setVolume(double newVolume) {
+    if (_webController != null && _isPlayerReady) {
+      setState(() {
+        _volume = newVolume;
+        _isMuted = false; // Unmute if volume is changed
+      });
+      _webController?.runJavaScript('player.setVolume(${newVolume.round()});');
+      _webController?.runJavaScript('player.unMute();');
+    } else {
+      setState(() {
+        _volume = newVolume;
+      });
+    }
+  }
+
+  void _toggleMute() async {
+    if (_webController != null && _isPlayerReady) {
+      final bool currentlyMuted = _isMuted; // Use local state for decision
+      if (currentlyMuted) {
+        await _webController?.runJavaScript('player.unMute();');
+      } else {
+        await _webController?.runJavaScript('player.mute();');
+      }
+      setState(() {
+        _isMuted = !currentlyMuted;
+      });
+    } else {
+      setState(() {
+        _isMuted = !_isMuted;
+      });
+    }
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -274,6 +336,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     );
   }
 
+  // --- Window Manager Listener Overrides ---
   @override
   void onWindowMaximize() {
     _updateFullScreenState();
@@ -334,6 +397,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                   _hasError = false;
                   _isPlaying = false;
                   _isPlayerReady = false;
+                  _volume = 100.0; // Reset volume
+                  _isMuted = false; // Reset mute state
                 });
               },
               onMinimize: WindowService.minimize,
@@ -342,6 +407,11 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               isPlaying: _isPlaying,
               webControllerExists: _webController != null,
               hasError: _hasError,
+              // NEW: Pass volume and mute state/callbacks
+              volume: _volume,
+              isMuted: _isMuted,
+              onVolumeChanged: _setVolume,
+              onToggleMute: _toggleMute,
             ),
           ],
         ),

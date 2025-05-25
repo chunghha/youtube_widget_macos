@@ -1,5 +1,6 @@
 // lib/widgets/control_overlay.dart
 import 'package:flutter/material.dart';
+import 'package:youtube_widget_macos/config/app_config.dart';
 
 class ControlOverlay extends StatelessWidget {
   final bool showControls;
@@ -15,6 +16,12 @@ class ControlOverlay extends StatelessWidget {
   final bool webControllerExists;
   final bool hasError;
 
+  // NEW: Volume and Mute parameters
+  final double volume;
+  final bool isMuted;
+  final ValueChanged<double> onVolumeChanged;
+  final VoidCallback onToggleMute;
+
   const ControlOverlay({
     Key? key,
     required this.showControls,
@@ -29,6 +36,11 @@ class ControlOverlay extends StatelessWidget {
     required this.isPlaying,
     required this.webControllerExists,
     required this.hasError,
+    // NEW: Required parameters
+    required this.volume,
+    required this.isMuted,
+    required this.onVolumeChanged,
+    required this.onToggleMute,
   }) : super(key: key);
 
   @override
@@ -118,7 +130,7 @@ class ControlOverlay extends StatelessWidget {
                           controller: urlController,
                           style: const TextStyle(color: Colors.white),
                           decoration: const InputDecoration(
-                            hintText: 'Paste YouTube URL here...',
+                            hintText: AppConfig.initialUrlInputHint,
                             hintStyle: TextStyle(color: Colors.grey),
                             border: InputBorder.none,
                             suffixIcon: Icon(
@@ -150,40 +162,72 @@ class ControlOverlay extends StatelessWidget {
                     ],
                   ),
                 )
-              else
+              else // Controls when video is playing
                 Container(
                   padding: const EdgeInsets.all(8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Column(
                     children: [
-                      IconButton(
-                        onPressed: onPlayPause,
-                        icon: Icon(
-                          isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white70,
-                          size: 24,
-                        ),
-                        tooltip: isPlaying ? 'Pause' : 'Play',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            onPressed: onPlayPause,
+                            icon: Icon(
+                              isPlaying ? Icons.pause : Icons.play_arrow,
+                              color: Colors.white70,
+                              size: 24,
+                            ),
+                            tooltip: isPlaying ? 'Pause' : 'Play',
+                          ),
+                          const SizedBox(width: 16),
+                          IconButton(
+                            onPressed: onStop,
+                            icon: const Icon(
+                              Icons.stop,
+                              color: Colors.white70,
+                              size: 24,
+                            ),
+                            tooltip: 'Stop Video',
+                          ),
+                          const SizedBox(width: 16),
+                          IconButton(
+                            onPressed: onLoadNewVideo,
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                            tooltip: 'Load New Video',
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        onPressed: onStop,
-                        icon: const Icon(
-                          Icons.stop,
-                          color: Colors.white70,
-                          size: 24,
-                        ),
-                        tooltip: 'Stop Video',
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        onPressed: onLoadNewVideo,
-                        icon: const Icon(
-                          Icons.refresh,
-                          color: Colors.white70,
-                          size: 20,
-                        ),
-                        tooltip: 'Load New Video',
+                      const SizedBox(height: 8), // Spacing for volume controls
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            onPressed: onToggleMute,
+                            icon: Icon(
+                              isMuted || volume == 0
+                                  ? Icons.volume_off
+                                  : Icons.volume_up,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                            tooltip: isMuted || volume == 0 ? 'Unmute' : 'Mute',
+                          ),
+                          Expanded(
+                            child: Slider(
+                              value: volume,
+                              min: 0,
+                              max: 100,
+                              divisions: 100,
+                              onChanged: onVolumeChanged,
+                              activeColor: Colors.red,
+                              inactiveColor: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
