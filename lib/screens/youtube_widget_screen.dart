@@ -1,0 +1,351 @@
+// lib/screens/youtube_widget_screen.dart
+import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:youtube_widget_macos/widgets/control_overlay.dart';
+import 'package:youtube_widget_macos/widgets/webview_player.dart';
+import 'package:youtube_widget_macos/utils/youtube_url_parser.dart';
+import 'package:youtube_widget_macos/services/window_service.dart';
+import 'package:youtube_widget_macos/services/keyboard_service.dart';
+
+class YouTubeWidgetScreen extends StatefulWidget {
+  const YouTubeWidgetScreen({Key? key}) : super(key: key);
+
+  @override
+  State<YouTubeWidgetScreen> createState() => _YouTubeWidgetScreenState();
+}
+
+class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
+    with WindowListener {
+  final TextEditingController _urlController = TextEditingController();
+  WebViewController? _webController;
+  String? _videoId;
+  bool _isLoading = false;
+  bool _showControls = true;
+  bool _hasError = false;
+  bool _isPlaying = false;
+  bool _isPlayerReady = false;
+  bool _isFullScreen = false;
+
+  late KeyboardService _keyboardService;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _initFullScreenState();
+
+    _keyboardService = KeyboardService(
+      onSpacePressed: _toggleControlsVisibility,
+      onCmdShiftEnterPressed: _toggleFullScreen,
+    );
+    _keyboardService.addHandler();
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    _urlController.dispose();
+    _keyboardService.removeHandler();
+    super.dispose();
+  }
+
+  void _toggleFullScreen() async {
+    final bool currentFullScreenState = await WindowService.isFullScreen();
+    await WindowService.setFullScreen(!currentFullScreenState);
+    await Future.delayed(const Duration(milliseconds: 100));
+    final bool newState = await WindowService.isFullScreen();
+    setState(() {
+      _isFullScreen = newState;
+    });
+  }
+
+  void _toggleControlsVisibility() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+  }
+
+  void _initFullScreenState() async {
+    _isFullScreen = await WindowService.isFullScreen();
+    setState(() {});
+  }
+
+  void _loadVideo() {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) return;
+
+    final videoId = YouTubeUrlParser.extractVideoId(url);
+
+    if (videoId != null) {
+      setState(() {
+        _videoId = videoId;
+        _hasError = false;
+        _isLoading = true;
+        _isPlayerReady = false;
+        _isPlaying = false;
+      });
+      _initializeWebView(videoId);
+    } else {
+      setState(() {
+        _hasError = true;
+      });
+      _showErrorDialog('Invalid YouTube URL. Try formats like:\n'
+          '• https://www.youtube.com/watch?v=VIDEO_ID\n'
+          '• https://youtu.be/VIDEO_ID');
+    }
+  }
+
+  void _initializeWebView(String videoId) {
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'PlayerChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          _onJavaScriptMessage(message.message);
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() {
+              _isLoading = true;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              _isLoading = false;
+            });
+            _webController?.runJavaScript('resizePlayer();');
+          },
+          onWebResourceError: (WebResourceError error) {
+            setState(() {
+              _isLoading = false;
+              _hasError = true;
+            });
+          },
+        ),
+      );
+
+    final String htmlContent = '''
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <style>
+              body { margin: 0; overflow: hidden; background-color: black; }
+              #player { width: 100vw; height: 100vh; }
+          </style>
+      </head>
+      <body>
+          <div id="player"></div>
+
+          <script>
+              var tag = document.createElement('script');
+              tag.src = "https://www.youtube.com/iframe_api";
+              var firstScriptTag = document.getElementsByTagName('script')[0];
+              firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+              var player;
+
+              function resizePlayer() {
+                  if (player && typeof player.setSize === 'function') {
+                      var width = window.innerWidth;
+                      var height = window.innerHeight;
+                      player.setSize(width, height);
+                  }
+              }
+
+              function onYouTubeIframeAPIReady() {
+                  player = new YT.Player('player', {
+                      videoId: '$videoId',
+                      playerVars: {
+                          'playsinline': 1,
+                          'controls': 1,
+                          'enablejsapi': 1,
+                          'origin': window.location.origin
+                      },
+                      events: {
+                          'onReady': onPlayerReady,
+                          'onStateChange': onPlayerStateChange,
+                          'onError': onPlayerError
+                      }
+                  });
+              }
+
+              function onPlayerReady(event) {
+                  setTimeout(function() {
+                      if (typeof PlayerChannel !== 'undefined') {
+                          PlayerChannel.postMessage('playerReady');
+                      }
+                  }, 50);
+                  resizePlayer();
+              }
+
+              function onPlayerStateChange(event) {
+                  if (typeof PlayerChannel !== 'undefined') {
+                      PlayerChannel.postMessage('state:' + event.data);
+                  }
+              }
+
+              function onPlayerError(event) {
+                  if (typeof PlayerChannel !== 'undefined') {
+                      PlayerChannel.postMessage('error:' + event.data);
+                  }
+              }
+
+              window.addEventListener('resize', resizePlayer);
+          </script>
+      </body>
+      </html>
+    ''';
+
+    _webController!.loadHtmlString(htmlContent);
+  }
+
+  void _onJavaScriptMessage(String message) {
+    if (message == 'playerReady') {
+      setState(() {
+        _isPlayerReady = true;
+      });
+    } else if (message.startsWith('state:')) {
+      final state = int.parse(message.split(':')[1]);
+      setState(() {
+        if (state == 1) {
+          _isPlaying = true;
+        } else if (state == 2) {
+          _isPlaying = false;
+        } else if (state == 0) {
+          _isPlaying = false;
+        }
+      });
+    } else if (message.startsWith('error:')) {
+      final errorCode = message.split(':')[1];
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+        _isPlaying = false;
+      });
+      _showErrorDialog(
+          'YouTube Player Error: $errorCode. This might be due to video restrictions or network issues.');
+    }
+  }
+
+  void _playVideo() {
+    if (_isPlayerReady) {
+      _webController?.runJavaScript('player.playVideo();');
+      setState(() {
+        _isPlaying = true;
+      });
+    }
+  }
+
+  void _pauseVideo() {
+    if (_isPlayerReady) {
+      _webController?.runJavaScript('player.pauseVideo();');
+      setState(() {
+        _isPlaying = false;
+      });
+    }
+  }
+
+  void _stopVideo() {
+    if (_isPlayerReady) {
+      _webController?.runJavaScript('player.stopVideo();');
+      setState(() {
+        _isPlaying = false;
+      });
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Error', style: TextStyle(color: Colors.white)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void onWindowMaximize() {
+    _updateFullScreenState();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    _updateFullScreenState();
+  }
+
+  @override
+  void onWindowEnterFullScreen() {
+    _updateFullScreenState();
+    _webController?.runJavaScript('resizePlayer();');
+  }
+
+  @override
+  void onWindowExitFullScreen() {
+    _updateFullScreenState();
+    _webController?.runJavaScript('resizePlayer();');
+  }
+
+  void _updateFullScreenState() async {
+    final bool currentFullScreenState = await WindowService.isFullScreen();
+    if (_isFullScreen != currentFullScreenState) {
+      setState(() {
+        _isFullScreen = currentFullScreenState;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: MouseRegion(
+        onEnter: (_) => setState(() => _showControls = true),
+        onExit: (_) => setState(() => _showControls = false),
+        child: Stack(
+          children: [
+            WebViewPlayer(
+              webController: _webController,
+              isLoading: _isLoading,
+              hasError: _hasError,
+            ),
+            ControlOverlay(
+              showControls: _showControls,
+              urlController: _urlController,
+              onLoadVideo: _loadVideo,
+              onPlayPause: _isPlaying ? _pauseVideo : _playVideo,
+              onStop: _stopVideo,
+              onLoadNewVideo: () {
+                setState(() {
+                  _urlController.clear();
+                  _webController = null;
+                  _videoId = null;
+                  _isLoading = false;
+                  _hasError = false;
+                  _isPlaying = false;
+                  _isPlayerReady = false;
+                });
+              },
+              onMinimize: WindowService.minimize,
+              onClose: WindowService.close,
+              onDragStart: WindowService.startDragging,
+              isPlaying: _isPlaying,
+              webControllerExists: _webController != null,
+              hasError: _hasError,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
