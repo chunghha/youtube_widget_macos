@@ -5,13 +5,13 @@ import 'package:webview_flutter/webview_flutter.dart';
 class WebViewPlayer extends StatelessWidget {
   final WebViewController? webController;
   final bool isLoading;
-  final bool hasError;
+  final String? errorMessage;
 
   const WebViewPlayer({
     Key? key,
     required this.webController,
     required this.isLoading,
-    required this.hasError,
+    required this.errorMessage,
   }) : super(key: key);
 
   @override
@@ -51,19 +51,20 @@ class WebViewPlayer extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              hasError ? Icons.error_outline : Icons.play_circle_outline,
+              errorMessage != null
+                  ? Icons.error_outline
+                  : Icons.play_circle_outline,
               size: 64,
-              color: hasError ? Colors.red : Colors.grey,
+              color: errorMessage != null ? Colors.red : Colors.grey,
             ),
             const SizedBox(height: 16),
             Text(
-              hasError
-                  ? 'Failed to load video'
-                  : 'Enter a YouTube URL to start',
+              errorMessage ?? 'Enter a YouTube URL to start',
               style: TextStyle(
-                color: hasError ? Colors.red : Colors.grey,
+                color: errorMessage != null ? Colors.red : Colors.grey,
                 fontSize: 16,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

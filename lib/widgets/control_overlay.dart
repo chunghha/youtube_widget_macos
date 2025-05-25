@@ -14,7 +14,7 @@ class ControlOverlay extends StatelessWidget {
   final VoidCallback onDragStart;
   final bool isPlaying;
   final bool webControllerExists;
-  final bool hasError;
+  final String? errorMessage;
 
   final double volume;
   final bool isMuted;
@@ -39,7 +39,7 @@ class ControlOverlay extends StatelessWidget {
     required this.onDragStart,
     required this.isPlaying,
     required this.webControllerExists,
-    required this.hasError,
+    required this.errorMessage,
     required this.volume,
     required this.isMuted,
     required this.onVolumeChanged,
@@ -182,10 +182,18 @@ class ControlOverlay extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: onLoadNewVideo,
+                          child: const Text('Clear Error',
+                              style: TextStyle(color: Colors.orange)),
+                        ),
+                      ],
                     ],
                   ),
                 )
-              else // Controls when video is playing
+              else
                 Container(
                   padding: const EdgeInsets.all(8),
                   child: Column(

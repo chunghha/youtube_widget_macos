@@ -25,7 +25,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   String? _videoId;
   bool _isLoading = false;
   bool _showControls = true;
-  bool _hasError = false;
+  String? _errorMessage;
   bool _isPlaying = false;
   bool _isPlayerReady = false;
   bool _isFullScreen = false;
@@ -103,7 +103,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     if (videoId != null) {
       setState(() {
         _videoId = videoId;
-        _hasError = false;
+        _errorMessage = null;
         _isLoading = true;
         _isPlayerReady = false;
         _isPlaying = false;
@@ -113,11 +113,10 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       _initializeWebView(videoId);
     } else {
       setState(() {
-        _hasError = true;
+        _errorMessage =
+            'Invalid YouTube URL format. Please use a valid YouTube video link.';
       });
-      _showErrorDialog('Invalid YouTube URL. Try formats like:\n'
-          '• https://www.youtube.com/watch?v=VIDEO_ID\n'
-          '• https://youtu.be/VIDEO_ID');
+      _showErrorDialog(_errorMessage!);
     }
   }
 
@@ -144,10 +143,18 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
             _webController?.runJavaScript('resizePlayer();');
           },
           onWebResourceError: (WebResourceError error) {
+            String message =
+                'Failed to load web resource: ${error.description}';
+            if (error.errorCode == -1009) {
+              message = 'Network Error: Please check your internet connection.';
+            } else if (error.errorCode == -1003) {
+              message = 'Host Not Found: The server could not be reached.';
+            }
             setState(() {
               _isLoading = false;
-              _hasError = true;
+              _errorMessage = message;
             });
+            _showErrorDialog(_errorMessage!);
           },
         ),
       );
@@ -241,6 +248,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     if (message == 'playerReady') {
       setState(() {
         _isPlayerReady = true;
+        _errorMessage = null;
       });
       _startProgressTimer();
       SharedPreferencesService.saveLastPlayedUrl(_urlController.text);
@@ -260,14 +268,31 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
         }
       });
     } else if (message.startsWith('error:')) {
-      final errorCode = message.split(':')[1];
+      final errorCode = int.parse(message.split(':')[1]);
+      String errorMessage;
+      switch (errorCode) {
+        case 2:
+          errorMessage =
+              'YouTube Player Error: Invalid video ID or parameters.';
+          break;
+        case 100:
+          errorMessage = 'YouTube Player Error: Video not found or is private.';
+          break;
+        case 101:
+        case 150:
+          errorMessage =
+              'YouTube Player Error: Video cannot be played in embedded players.';
+          break;
+        default:
+          errorMessage =
+              'YouTube Player Error: An unknown error occurred (Code: $errorCode).';
+      }
       setState(() {
-        _hasError = true;
+        _errorMessage = errorMessage;
         _isLoading = false;
         _isPlaying = false;
       });
-      _showErrorDialog(
-          'YouTube Player Error: $errorCode. This might be due to video restrictions or network issues.');
+      _showErrorDialog(_errorMessage!);
     }
   }
 
@@ -364,7 +389,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _stopProgressTimer();
     _progressTimer =
         Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-      if (_webController != null &&
+      if (mounted &&
+          _webController != null &&
           _isPlayerReady &&
           _isPlaying &&
           !_isDraggingSlider) {
@@ -461,13 +487,13 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
             WebViewPlayer(
               webController: _webController,
               isLoading: _isLoading,
-              hasError: _hasError,
+              errorMessage: _errorMessage,
             ),
             ControlOverlay(
               showControls: _showControls,
               urlController: _urlController,
               onLoadVideo: _loadVideo,
-              onPlayPause: _isPlaying ? _pauseVideo : _playVideo,
+              onPlayPause: _playPauseVideo,
               onStop: _stopVideo,
               onLoadNewVideo: () {
                 setState(() {
@@ -475,7 +501,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                   _webController = null;
                   _videoId = null;
                   _isLoading = false;
-                  _hasError = false;
+                  _errorMessage = null;
                   _isPlaying = false;
                   _isPlayerReady = false;
                   _volume = 100.0;
@@ -490,7 +516,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               onDragStart: WindowService.startDragging,
               isPlaying: _isPlaying,
               webControllerExists: _webController != null,
-              hasError: _hasError,
+              errorMessage: _errorMessage,
               volume: _volume,
               isMuted: _isMuted,
               onVolumeChanged: _setVolume,
