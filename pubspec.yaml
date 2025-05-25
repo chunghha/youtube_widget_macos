@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
 
   # Window management for macOS
-  window_manager: ^0.3.7
+  window_manager: ^0.4.3
 
   # WebView for YouTube
   webview_flutter: ^4.4.2
@@ -24,7 +24,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
   flutter_launcher_icons: "^0.14.3" # Use the latest version
 
 flutter:
