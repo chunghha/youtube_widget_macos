@@ -28,6 +28,7 @@ class ControlOverlay extends StatelessWidget {
 
   final bool showMediaControls;
   final VoidCallback onToggleControlsIcon;
+  final bool isLiveStream; // NEW: Live stream status
 
   const ControlOverlay({
     Key? key,
@@ -53,6 +54,7 @@ class ControlOverlay extends StatelessWidget {
     required this.onSliderChanged,
     required this.showMediaControls,
     required this.onToggleControlsIcon,
+    required this.isLiveStream, // NEW: Required parameter
   }) : super(key: key);
 
   String _formatDuration(double seconds) {
@@ -79,8 +81,6 @@ class ControlOverlay extends StatelessWidget {
     if (totalDuration > 0 &&
         currentPosition > totalDuration * 0.99 &&
         currentPosition < totalDuration) {
-      // If current position is very close to total duration but not exactly,
-      // slightly extend total duration to prevent slider from hitting max prematurely
       effectiveTotalDuration = totalDuration * 1.001;
     }
     final double sliderMax =
@@ -271,38 +271,64 @@ class ControlOverlay extends StatelessWidget {
                       if (showMediaControls) ...[
                         const SizedBox(height: 8),
 
-                        // Progress Bar
-                        Row(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              child: Text(
-                                _formatDuration(currentPosition),
-                                style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
-                              ),
+                        // Progress Bar or Live Indicator
+                        if (isLiveStream) // NEW: Show LIVE indicator for live streams
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle, color: Colors.red, size: 12),
+                                SizedBox(width: 4),
+                                Text(
+                                  'LIVE',
+                                  style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Spacer(),
+                                Text(
+                                  _formatDuration(
+                                      currentPosition), // Still show current time for live
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
                             ),
-                            Expanded(
-                              child: Slider(
-                                value: sliderValue,
-                                min: 0,
-                                max: sliderMax,
-                                onChanged: onSliderChanged,
-                                onChangeEnd: onSeek,
-                                activeColor: Colors.cyan[700],
-                                inactiveColor: Colors.grey,
+                          )
+                        else // Show normal progress bar for VOD
+                          Row(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: Text(
+                                  _formatDuration(currentPosition),
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12),
+                                ),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: Text(
-                                _formatDuration(totalDuration),
-                                style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
+                              Expanded(
+                                child: Slider(
+                                  value: sliderValue,
+                                  min: 0,
+                                  max: sliderMax,
+                                  onChanged: onSliderChanged,
+                                  onChangeEnd: onSeek,
+                                  activeColor: Colors.cyan[700],
+                                  inactiveColor: Colors.grey,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: Text(
+                                  _formatDuration(totalDuration),
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
                         const SizedBox(height: 8),
 
                         // Volume Controls

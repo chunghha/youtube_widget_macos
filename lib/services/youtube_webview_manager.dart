@@ -2,8 +2,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:youtube_widget_macos/utils/youtube_url_parser.dart';
-import 'package:youtube_widget_macos/services/shared_preferences_service.dart';
 
 class YouTubeWebViewManager {
   WebViewController? _webViewController;
@@ -14,6 +12,7 @@ class YouTubeWebViewManager {
   final ValueNotifier<double> totalDurationNotifier = ValueNotifier(0.0);
   final ValueNotifier<String?> errorMessageNotifier = ValueNotifier(null);
   final ValueNotifier<bool> isLoadingNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> isLiveStreamNotifier = ValueNotifier(false);
 
   double _currentVolume = 100.0;
   bool _isCurrentlyMuted = false;
@@ -36,13 +35,20 @@ class YouTubeWebViewManager {
     currentPositionNotifier.value = 0.0;
     totalDurationNotifier.value = 0.0;
     errorMessageNotifier.value = null;
+    isLiveStreamNotifier.value = false;
 
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel(
         'PlayerChannel',
-        onMessageReceived: (JavaScriptMessage message) => _onJavaScriptMessage(
-            message.message), // CORRECTED: Pass message.message
+        onMessageReceived: (JavaScriptMessage message) =>
+            _onJavaScriptMessage(message.message),
+      )
+      ..addJavaScriptChannel(
+        'ConsoleChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          // print('WebView Console: ${message.message}');
+        },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -111,7 +117,7 @@ class YouTubeWebViewManager {
   }
 
   Future<void> seekTo(double seconds) async {
-    if (isPlayerReadyNotifier.value) {
+    if (isPlayerReadyNotifier.value && !isLiveStreamNotifier.value) {
       await _webViewController?.runJavaScript('player.seekTo($seconds, true);');
       currentPositionNotifier.value = seconds;
       _isDraggingSlider = false;
@@ -133,6 +139,7 @@ class YouTubeWebViewManager {
     totalDurationNotifier.dispose();
     errorMessageNotifier.dispose();
     isLoadingNotifier.dispose();
+    isLiveStreamNotifier.dispose();
   }
 
   String _generateHtmlContent(
@@ -271,7 +278,7 @@ class YouTubeWebViewManager {
   }
 
   void _startProgressTimer() {
-    _stopProgressTimer();
+    _progressTimer?.cancel();
     _progressTimer =
         Timer.periodic(const Duration(milliseconds: 500), (timer) async {
       if (_webViewController != null &&
@@ -284,12 +291,17 @@ class YouTubeWebViewManager {
           final Object? durationResult = await _webViewController
               ?.runJavaScriptReturningResult('player.getDuration();');
 
-          final double? current =
-              (currentTimeResult is num) ? currentTimeResult.toDouble() : null;
-          final double? duration =
-              (durationResult is num) ? durationResult.toDouble() : null;
+          final double current =
+              (currentTimeResult is num) ? currentTimeResult.toDouble() : 0.0;
+          final double duration =
+              (durationResult is num) ? durationResult.toDouble() : 0.0;
 
-          if (current != null && duration != null) {
+          if (duration == 0.0 || duration.isInfinite || duration > 1000000000) {
+            isLiveStreamNotifier.value = true;
+            currentPositionNotifier.value = 0.0;
+            totalDurationNotifier.value = 0.0;
+          } else {
+            isLiveStreamNotifier.value = false;
             currentPositionNotifier.value = current;
             totalDurationNotifier.value = duration;
           }
@@ -297,7 +309,8 @@ class YouTubeWebViewManager {
           // Handle JavaScript execution errors gracefully
         }
       } else if (!isPlayingNotifier.value) {
-        _stopProgressTimer();
+        _progressTimer?.cancel();
+        _progressTimer = null;
       }
     });
   }

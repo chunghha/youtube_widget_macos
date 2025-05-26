@@ -3,7 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:youtube_widget_macos/widgets/control_overlay.dart';
 import 'package:youtube_widget_macos/widgets/webview_player.dart';
 import 'package:youtube_widget_macos/utils/youtube_url_parser.dart';
@@ -37,7 +36,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
 
   double _currentPosition = 0.0;
   double _totalDuration = 0.0;
-  Timer? _progressTimer;
+  bool _isLiveStream = false; // NEW: State for live stream
+
   bool _isDraggingSlider = false;
 
   bool _showMediaControls = false;
@@ -56,6 +56,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _webViewManager.isPlayerReadyNotifier.addListener(_updatePlayerReadyState);
     _webViewManager.currentPositionNotifier.addListener(_updateCurrentPosition);
     _webViewManager.totalDurationNotifier.addListener(_updateTotalDuration);
+    _webViewManager.isLiveStreamNotifier.addListener(
+        _updateLiveStreamState); // NEW: Listen to live stream notifier
 
     _keyboardService = KeyboardService(
       onSpacePressed: _toggleControlsVisibility,
@@ -82,6 +84,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _webViewManager.currentPositionNotifier
         .removeListener(_updateCurrentPosition);
     _webViewManager.totalDurationNotifier.removeListener(_updateTotalDuration);
+    _webViewManager.isLiveStreamNotifier
+        .removeListener(_updateLiveStreamState); // NEW: Remove listener
     _webViewManager.dispose();
 
     super.dispose();
@@ -99,6 +103,9 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       () => _currentPosition = _webViewManager.currentPositionNotifier.value);
   void _updateTotalDuration() => setState(
       () => _totalDuration = _webViewManager.totalDurationNotifier.value);
+  void _updateLiveStreamState() =>
+      setState(() => _isLiveStream = _webViewManager
+          .isLiveStreamNotifier.value); // NEW: Update live stream state
 
   void _loadInitialSettings() async {
     final String? lastUrl = await SharedPreferencesService.loadLastPlayedUrl();
@@ -161,6 +168,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       _webViewManager.currentPositionNotifier
           .addListener(_updateCurrentPosition);
       _webViewManager.totalDurationNotifier.addListener(_updateTotalDuration);
+      _webViewManager.isLiveStreamNotifier
+          .addListener(_updateLiveStreamState); // NEW: Re-attach listener
 
       _webViewManager.initialize(videoId, _volume, _isMuted);
       SharedPreferencesService.saveLastPlayedUrl(url);
@@ -210,50 +219,6 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
 
   void _seekTo(double seconds) {
     _webViewManager.seekTo(seconds);
-  }
-
-  void _startProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer =
-        Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-      if (mounted &&
-          _webViewManager.webViewController != null &&
-          _isPlayerReady &&
-          _isPlaying &&
-          !_isDraggingSlider) {
-        try {
-          final Object? currentTimeResult = await _webViewManager
-              .webViewController
-              ?.runJavaScriptReturningResult('player.getCurrentTime();');
-          final Object? durationResult = await _webViewManager.webViewController
-              ?.runJavaScriptReturningResult('player.getDuration();');
-
-          final double? current =
-              (currentTimeResult is num) ? currentTimeResult.toDouble() : null;
-          final double? duration =
-              (durationResult is num) ? durationResult.toDouble() : null;
-
-          if (current != null && duration != null) {
-            if (mounted) {
-              setState(() {
-                _currentPosition = current;
-                _totalDuration = duration;
-              });
-            }
-          }
-        } catch (e) {
-          // Handle JavaScript execution errors gracefully
-        }
-      } else if (!_isPlaying) {
-        _progressTimer?.cancel();
-        _progressTimer = null;
-      }
-    });
-  }
-
-  void _stopProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = null;
   }
 
   void _showErrorDialog(String message) {
@@ -340,6 +305,8 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                     .addListener(_updateCurrentPosition);
                 _webViewManager.totalDurationNotifier
                     .addListener(_updateTotalDuration);
+                _webViewManager.isLiveStreamNotifier.addListener(
+                    _updateLiveStreamState); // NEW: Re-attach listener
 
                 setState(() {
                   _isLoading = false;
@@ -350,6 +317,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
                   _isMuted = false;
                   _currentPosition = 0.0;
                   _totalDuration = 0.0;
+                  _isLiveStream = false; // NEW: Reset live stream state
                   _showMediaControls = false;
                 });
               },
@@ -369,6 +337,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
               onSliderChanged: _onSliderChanged,
               showMediaControls: _showMediaControls,
               onToggleControlsIcon: _toggleMediaControlsVisibility,
+              isLiveStream: _isLiveStream, // NEW: Pass live stream status
             ),
           ],
         ),
