@@ -73,6 +73,21 @@ class ControlOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure slider max is at least 1.0 to prevent assertion errors when totalDuration is 0.0
+    // For very long videos, ensure max is slightly greater than currentPosition if currentPosition is near totalDuration
+    double effectiveTotalDuration = totalDuration;
+    if (totalDuration > 0 &&
+        currentPosition > totalDuration * 0.99 &&
+        currentPosition < totalDuration) {
+      // If current position is very close to total duration but not exactly,
+      // slightly extend total duration to prevent slider from hitting max prematurely
+      effectiveTotalDuration = totalDuration * 1.001;
+    }
+    final double sliderMax =
+        effectiveTotalDuration > 0 ? effectiveTotalDuration : 1.0;
+    // Clamp currentPosition to be within the valid range [0, sliderMax]
+    final double sliderValue = currentPosition.clamp(0.0, sliderMax);
+
     return IgnorePointer(
       ignoring: !showControls,
       child: AnimatedOpacity(
@@ -205,10 +220,8 @@ class ControlOverlay extends StatelessWidget {
                     children: [
                       // Play/Pause/Stop/New Video buttons AND Toggle Controls Icon (aligned horizontally)
                       Row(
-                        // Use MainAxisAlignment.spaceBetween to push ends, then Spacers for centering
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Left Spacer to help center the main buttons
                           const Spacer(),
                           IconButton(
                             onPressed: onPlayPause,
@@ -239,9 +252,7 @@ class ControlOverlay extends StatelessWidget {
                             ),
                             tooltip: 'Load New Video',
                           ),
-                          // Right Spacer to help center the main buttons
                           const Spacer(),
-                          // Toggle Media Controls Icon Button (pushed to far right)
                           IconButton(
                             onPressed: onToggleControlsIcon,
                             icon: Icon(
@@ -273,9 +284,9 @@ class ControlOverlay extends StatelessWidget {
                             ),
                             Expanded(
                               child: Slider(
-                                value: currentPosition,
+                                value: sliderValue,
                                 min: 0,
-                                max: totalDuration > 0 ? totalDuration : 0.0,
+                                max: sliderMax,
                                 onChanged: onSliderChanged,
                                 onChangeEnd: onSeek,
                                 activeColor: Colors.cyan[700],
@@ -311,7 +322,6 @@ class ControlOverlay extends StatelessWidget {
                                   isMuted || volume == 0 ? 'Unmute' : 'Mute',
                             ),
                             Expanded(
-                              // Volume Slider
                               child: Slider(
                                 value: volume,
                                 min: 0,

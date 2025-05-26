@@ -1,4 +1,6 @@
 // lib/screens/youtube_widget_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -29,10 +31,15 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   bool _isPlaying = false;
   bool _isPlayerReady = false;
   bool _isFullScreen = false;
+
   double _volume = 100.0;
   bool _isMuted = false;
+
   double _currentPosition = 0.0;
   double _totalDuration = 0.0;
+  Timer? _progressTimer;
+  bool _isDraggingSlider = false;
+
   bool _showMediaControls = false;
 
   @override
@@ -41,7 +48,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     _webViewManager = YouTubeWebViewManager();
     windowManager.addListener(this);
     _initFullScreenState();
-    _loadLastPlayedUrl();
+    _loadInitialSettings();
 
     _webViewManager.isLoadingNotifier.addListener(_updateLoadingState);
     _webViewManager.errorMessageNotifier.addListener(_updateErrorMessage);
@@ -93,8 +100,14 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
   void _updateTotalDuration() => setState(
       () => _totalDuration = _webViewManager.totalDurationNotifier.value);
 
-  void _loadLastPlayedUrl() async {
+  void _loadInitialSettings() async {
     final String? lastUrl = await SharedPreferencesService.loadLastPlayedUrl();
+    final double savedVolume = await SharedPreferencesService.loadVolume();
+
+    setState(() {
+      _volume = savedVolume;
+    });
+
     if (lastUrl != null && lastUrl.isNotEmpty) {
       _urlController.text = lastUrl;
       _loadVideo();
@@ -138,6 +151,17 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
     final videoId = YouTubeUrlParser.extractVideoId(url);
 
     if (videoId != null) {
+      _webViewManager.dispose();
+      _webViewManager = YouTubeWebViewManager();
+      _webViewManager.isLoadingNotifier.addListener(_updateLoadingState);
+      _webViewManager.errorMessageNotifier.addListener(_updateErrorMessage);
+      _webViewManager.isPlayingNotifier.addListener(_updatePlayingState);
+      _webViewManager.isPlayerReadyNotifier
+          .addListener(_updatePlayerReadyState);
+      _webViewManager.currentPositionNotifier
+          .addListener(_updateCurrentPosition);
+      _webViewManager.totalDurationNotifier.addListener(_updateTotalDuration);
+
       _webViewManager.initialize(videoId, _volume, _isMuted);
       SharedPreferencesService.saveLastPlayedUrl(url);
     } else {
@@ -167,6 +191,7 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
       _isMuted = false;
     });
     _webViewManager.setVolume(newVolume);
+    SharedPreferencesService.saveVolume(newVolume);
   }
 
   void _toggleMute() async {
@@ -185,6 +210,50 @@ class _YouTubeWidgetScreenState extends State<YouTubeWidgetScreen>
 
   void _seekTo(double seconds) {
     _webViewManager.seekTo(seconds);
+  }
+
+  void _startProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer =
+        Timer.periodic(const Duration(milliseconds: 500), (timer) async {
+      if (mounted &&
+          _webViewManager.webViewController != null &&
+          _isPlayerReady &&
+          _isPlaying &&
+          !_isDraggingSlider) {
+        try {
+          final Object? currentTimeResult = await _webViewManager
+              .webViewController
+              ?.runJavaScriptReturningResult('player.getCurrentTime();');
+          final Object? durationResult = await _webViewManager.webViewController
+              ?.runJavaScriptReturningResult('player.getDuration();');
+
+          final double? current =
+              (currentTimeResult is num) ? currentTimeResult.toDouble() : null;
+          final double? duration =
+              (durationResult is num) ? durationResult.toDouble() : null;
+
+          if (current != null && duration != null) {
+            if (mounted) {
+              setState(() {
+                _currentPosition = current;
+                _totalDuration = duration;
+              });
+            }
+          }
+        } catch (e) {
+          // Handle JavaScript execution errors gracefully
+        }
+      } else if (!_isPlaying) {
+        _progressTimer?.cancel();
+        _progressTimer = null;
+      }
+    });
+  }
+
+  void _stopProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
   }
 
   void _showErrorDialog(String message) {
