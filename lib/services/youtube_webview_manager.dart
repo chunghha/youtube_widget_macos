@@ -13,6 +13,8 @@ class YouTubeWebViewManager {
   final ValueNotifier<String?> errorMessageNotifier = ValueNotifier(null);
   final ValueNotifier<bool> isLoadingNotifier = ValueNotifier(false);
   final ValueNotifier<bool> isLiveStreamNotifier = ValueNotifier(false);
+  final ValueNotifier<WebViewController?> webViewControllerNotifier =
+      ValueNotifier(null);
 
   double _currentVolume = 100.0;
   bool _isCurrentlyMuted = false;
@@ -36,6 +38,7 @@ class YouTubeWebViewManager {
     totalDurationNotifier.value = 0.0;
     errorMessageNotifier.value = null;
     isLiveStreamNotifier.value = false;
+    webViewControllerNotifier.value = null;
 
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -64,6 +67,8 @@ class YouTubeWebViewManager {
           },
         ),
       );
+
+    webViewControllerNotifier.value = _webViewController;
 
     final String htmlContent =
         _generateHtmlContent(videoId, initialVolume, initialMuted);
@@ -140,6 +145,7 @@ class YouTubeWebViewManager {
     errorMessageNotifier.dispose();
     isLoadingNotifier.dispose();
     isLiveStreamNotifier.dispose();
+    webViewControllerNotifier.dispose();
   }
 
   String _generateHtmlContent(
@@ -180,7 +186,7 @@ class YouTubeWebViewManager {
                       videoId: '$videoId',
                       playerVars: {
                           'playsinline': 1,
-                          'controls': 1,
+                          'controls': 0, // CHANGED: Hide native controls
                           'enablejsapi': 1,
                           'origin': window.location.origin
                       },
