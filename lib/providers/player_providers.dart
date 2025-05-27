@@ -240,6 +240,33 @@ class YouTubePlayerNotifier extends StateNotifier<YouTubePlayerState> {
     _webViewManager.resizePlayerInWebView();
   }
 
+  // Reset method to load saved volume
+  void reset() async {
+    _detachListeners();
+    _webViewManager.dispose();
+    _webViewManager = YouTubeWebViewManager();
+    _attachListeners();
+
+    final double savedVolume =
+        await SharedPreferencesService.loadVolume(); // Load saved volume
+
+    state = YouTubePlayerState(
+      isLoading: false,
+      isPlaying: false,
+      isPlayerReady: false,
+      currentPosition: 0.0,
+      totalDuration: 0.0,
+      volume: savedVolume, // Use saved volume here
+      isMuted: false,
+      isLiveStream: false,
+      showControls: true,
+      showMediaControls: false,
+      webViewController: null,
+      isFullScreen: false,
+    );
+    _ref.read(urlControllerProvider).clear();
+  }
+
   @override
   void dispose() {
     _detachListeners();
@@ -254,9 +281,7 @@ final youtubePlayerProvider =
   return YouTubePlayerNotifier(ref);
 });
 
-final urlControllerProvider = Provider((ref) {
-  return TextEditingController();
-});
+final urlControllerProvider = Provider((ref) => TextEditingController());
 
 final keyboardServiceProvider = Provider((ref) {
   final playerNotifier = ref.watch(youtubePlayerProvider.notifier);

@@ -1,13 +1,11 @@
 // lib/screens/youtube_widget_screen.dart
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_widget_macos/widgets/control_overlay.dart';
 import 'package:youtube_widget_macos/widgets/webview_player.dart';
 import 'package:youtube_widget_macos/providers/player_providers.dart';
 import 'package:youtube_widget_macos/services/window_service.dart';
-import 'package:youtube_widget_macos/services/keyboard_service.dart';
 
 class YouTubeWidgetScreen extends ConsumerStatefulWidget {
   const YouTubeWidgetScreen({Key? key}) : super(key: key);
@@ -98,8 +96,8 @@ class _YouTubeWidgetScreenState extends ConsumerState<YouTubeWidgetScreen>
               onPlayPause: playerNotifier.playPause,
               onStop: playerNotifier.stop,
               onLoadNewVideo: () {
-                urlController.clear();
-                playerNotifier.loadVideo('');
+                urlController.clear(); // Clear the text field
+                playerNotifier.reset(); // Call the reset method
               },
               onMinimize: WindowService.minimize,
               onClose: WindowService.close,
