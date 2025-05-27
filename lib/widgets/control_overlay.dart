@@ -28,7 +28,7 @@ class ControlOverlay extends StatelessWidget {
 
   final bool showMediaControls;
   final VoidCallback onToggleControlsIcon;
-  final bool isLiveStream; // NEW: Live stream status
+  final bool isLiveStream; // NEW: Add isLiveStream parameter
 
   const ControlOverlay({
     Key? key,
@@ -54,7 +54,7 @@ class ControlOverlay extends StatelessWidget {
     required this.onSliderChanged,
     required this.showMediaControls,
     required this.onToggleControlsIcon,
-    required this.isLiveStream, // NEW: Required parameter
+    required this.isLiveStream, // NEW: Add to constructor
   }) : super(key: key);
 
   String _formatDuration(double seconds) {
@@ -75,8 +75,6 @@ class ControlOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure slider max is at least 1.0 to prevent assertion errors when totalDuration is 0.0
-    // For very long videos, ensure max is slightly greater than currentPosition if currentPosition is near totalDuration
     double effectiveTotalDuration = totalDuration;
     if (totalDuration > 0 &&
         currentPosition > totalDuration * 0.99 &&
@@ -85,7 +83,6 @@ class ControlOverlay extends StatelessWidget {
     }
     final double sliderMax =
         effectiveTotalDuration > 0 ? effectiveTotalDuration : 1.0;
-    // Clamp currentPosition to be within the valid range [0, sliderMax]
     final double sliderValue = currentPosition.clamp(0.0, sliderMax);
 
     return IgnorePointer(
@@ -272,7 +269,7 @@ class ControlOverlay extends StatelessWidget {
                         const SizedBox(height: 8),
 
                         // Progress Bar or Live Indicator
-                        if (isLiveStream) // NEW: Show LIVE indicator for live streams
+                        if (isLiveStream)
                           Padding(
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 8.0),
@@ -289,15 +286,14 @@ class ControlOverlay extends StatelessWidget {
                                 ),
                                 Spacer(),
                                 Text(
-                                  _formatDuration(
-                                      currentPosition), // Still show current time for live
+                                  _formatDuration(currentPosition),
                                   style: const TextStyle(
                                       color: Colors.white70, fontSize: 12),
                                 ),
                               ],
                             ),
                           )
-                        else // Show normal progress bar for VOD
+                        else
                           Row(
                             children: [
                               Padding(

@@ -22,6 +22,7 @@ class YouTubePlayerState {
   final bool showControls;
   final bool showMediaControls;
   final WebViewController? webViewController;
+  final bool isFullScreen;
 
   YouTubePlayerState({
     required this.isLoading,
@@ -36,6 +37,7 @@ class YouTubePlayerState {
     required this.showControls,
     required this.showMediaControls,
     this.webViewController,
+    required this.isFullScreen,
   });
 
   YouTubePlayerState copyWith({
@@ -51,6 +53,7 @@ class YouTubePlayerState {
     bool? showControls,
     bool? showMediaControls,
     WebViewController? webViewController,
+    bool? isFullScreen,
   }) {
     return YouTubePlayerState(
       isLoading: isLoading ?? this.isLoading,
@@ -65,6 +68,7 @@ class YouTubePlayerState {
       showControls: showControls ?? this.showControls,
       showMediaControls: showMediaControls ?? this.showMediaControls,
       webViewController: webViewController ?? this.webViewController,
+      isFullScreen: isFullScreen ?? this.isFullScreen,
     );
   }
 }
@@ -88,6 +92,7 @@ class YouTubePlayerNotifier extends StateNotifier<YouTubePlayerState> {
           showControls: true,
           showMediaControls: false,
           webViewController: null,
+          isFullScreen: false,
         )) {
     _attachListeners();
     _loadInitialSettings();
@@ -161,6 +166,7 @@ class YouTubePlayerNotifier extends StateNotifier<YouTubePlayerState> {
         isLiveStream: false,
         showMediaControls: false,
         webViewController: null,
+        isFullScreen: false,
       );
 
       await _webViewManager.initialize(videoId, state.volume, state.isMuted);
@@ -208,12 +214,10 @@ class YouTubePlayerNotifier extends StateNotifier<YouTubePlayerState> {
     state = state.copyWith(showControls: !state.showControls);
   }
 
-  // NEW: Explicitly show controls
   void showControls() {
     state = state.copyWith(showControls: true);
   }
 
-  // NEW: Explicitly hide controls
   void hideControls() {
     state = state.copyWith(showControls: false);
   }
@@ -225,7 +229,14 @@ class YouTubePlayerNotifier extends StateNotifier<YouTubePlayerState> {
     }
   }
 
+  Future<void> toggleFullScreen() async {
+    final bool currentFullScreenState = await WindowService.isFullScreen();
+    await Future.delayed(const Duration(milliseconds: 50));
+    await WindowService.setFullScreen(!currentFullScreenState);
+  }
+
   void onWindowFullScreenChanged(bool isCurrentlyFullScreen) {
+    state = state.copyWith(isFullScreen: isCurrentlyFullScreen);
     _webViewManager.resizePlayerInWebView();
   }
 
@@ -243,19 +254,23 @@ final youtubePlayerProvider =
   return YouTubePlayerNotifier(ref);
 });
 
-final urlControllerProvider = Provider((ref) => TextEditingController());
+final urlControllerProvider = Provider((ref) {
+  return TextEditingController();
+});
 
 final keyboardServiceProvider = Provider((ref) {
   final playerNotifier = ref.watch(youtubePlayerProvider.notifier);
-  return KeyboardService(
+  final service = KeyboardService(
     onSpacePressed: playerNotifier.toggleControlsVisibility,
-    onCmdShiftEnterPressed: () async {
-      final bool currentFullScreenState = await WindowService.isFullScreen();
-      await WindowService.setFullScreen(!currentFullScreenState);
-    },
+    onCmdShiftEnterPressed: playerNotifier.toggleFullScreen,
     onPlayPausePressed: playerNotifier.playPause,
     onStopPressed: playerNotifier.stop,
     onQuitPressed: WindowService.close,
     onCmdCPressed: playerNotifier.toggleMediaControlsVisibility,
   );
+  service.addHandler();
+  ref.onDispose(() {
+    service.removeHandler();
+  });
+  return service;
 });

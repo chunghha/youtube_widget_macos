@@ -19,6 +19,8 @@ class YouTubeWidgetScreen extends ConsumerStatefulWidget {
 
 class _YouTubeWidgetScreenState extends ConsumerState<YouTubeWidgetScreen>
     with WindowListener {
+  bool _isFullScreen = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,22 +49,27 @@ class _YouTubeWidgetScreenState extends ConsumerState<YouTubeWidgetScreen>
   @override
   void onWindowEnterFullScreen() {
     _updateFullScreenState();
-    ref.read(youtubePlayerProvider.notifier).onWindowFullScreenChanged(true);
   }
 
   @override
   void onWindowExitFullScreen() {
     _updateFullScreenState();
-    ref.read(youtubePlayerProvider.notifier).onWindowFullScreenChanged(false);
   }
 
   void _updateFullScreenState() async {
-    await WindowService.isFullScreen();
-    setState(() {});
+    final bool currentFullScreenState = await WindowService.isFullScreen();
+    if (_isFullScreen != currentFullScreenState) {
+      setState(() {
+        _isFullScreen = currentFullScreenState;
+      });
+      ref
+          .read(youtubePlayerProvider.notifier)
+          .onWindowFullScreenChanged(currentFullScreenState);
+    }
   }
 
   void _initFullScreenState() async {
-    await WindowService.isFullScreen();
+    _isFullScreen = await WindowService.isFullScreen();
     setState(() {});
   }
 
@@ -75,8 +82,8 @@ class _YouTubeWidgetScreenState extends ConsumerState<YouTubeWidgetScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: MouseRegion(
-        onEnter: (_) => playerNotifier.showControls(), // NEW: Explicitly show
-        onExit: (_) => playerNotifier.hideControls(), // NEW: Explicitly hide
+        onEnter: (_) => playerNotifier.showControls(),
+        onExit: (_) => playerNotifier.hideControls(),
         child: Stack(
           children: [
             WebViewPlayer(

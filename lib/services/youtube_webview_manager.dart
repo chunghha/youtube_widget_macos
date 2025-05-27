@@ -186,7 +186,7 @@ class YouTubeWebViewManager {
                       videoId: '$videoId',
                       playerVars: {
                           'playsinline': 1,
-                          'controls': 0, // CHANGED: Hide native controls
+                          'controls': 0,
                           'enablejsapi': 1,
                           'origin': window.location.origin
                       },
